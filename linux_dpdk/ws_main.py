@@ -119,6 +119,7 @@ def options(opt):
     opt.add_option('--publish-commit', '--publish_commit', dest='publish_commit', default=False, action='store', help="Specify commit id for 'publish_both' option (Please make sure it's good!)")
     opt.add_option('--no-mlx', dest='no_mlx', default=(True if march == 'aarch64' else False), action='store', help="don't use mlx5 dpdk driver. use with ./b configure --no-mlx. no need to run build with it")
     opt.add_option('--with-ntacc', dest='with_ntacc', default=False, action='store_true', help="Use Napatech dpdk driver. Use with ./b configure --with-ntacc.")
+    opt.add_option('--with-lio', dest='with_lio', default=False, action='store_true', help="Use Cavium Liquidio dpdk driver. Use with ./b configure --with-lio.")
     opt.add_option('--no-ver', action = 'store_true', help = "Don't update version file.")
     opt.add_option('--private', dest='private', action = 'store_true', help = "private publish, do not replace latest/be_latest image with this image")
 
@@ -279,6 +280,7 @@ def configure(conf):
     conf.check_cxx(lib = 'z', errmsg = missing_pkg_msg(fedora = 'zlib-devel', ubuntu = 'zlib1g-dev'))
     no_mlx          = conf.options.no_mlx
     with_ntacc      = conf.options.with_ntacc
+    with_lio   = conf.options.with_lio
     with_sanitized  = conf.options.sanitized
     
     configure_sanitized(conf, with_sanitized)
@@ -303,6 +305,8 @@ def configure(conf):
             Logs.pprint('RED', 'Cannot find NTAPI. If you need to use Napatech NICs, install the Napatech driver:\n' +
                                   'https://www.napatech.com/downloads/')
             raise Exception("Cannot find libntapi");
+
+    conf.env.WITH_LIQUIDIO = with_lio
 
           
 
@@ -683,7 +687,6 @@ dpdk_src_x86_64 = SrcGroup(dir='src/dpdk/',
                  'drivers/net/ena/base/ena_com.c',
                  'drivers/net/ena/base/ena_eth_com.c',
 
-
                  #libs
                  'lib/librte_eal/common/arch/x86/rte_cpuflags.c',
                  'lib/librte_eal/common/arch/x86/rte_spinlock.c',
@@ -874,6 +877,14 @@ mlx4_dpdk_src = SrcGroup(dir='src/dpdk/drivers/net/mlx4',
                  'mlx4_utils.c',
             ]);
 
+lio_dpdk_src = SrcGroup(dir='src/dpdk/drivers/net/liquidio',
+                    src_list=[
+                      'lio_ethdev.c',
+                      'lio_rxtx.c',
+                      'base/lio_23xx_vf.c',
+                      'base/lio_mbox.c'
+                   ]);
+
 if march == 'x86_64':
     bp_dpdk = SrcGroups([
                   dpdk_src,
@@ -910,6 +921,9 @@ mlx4_dpdk =SrcGroups([
                 mlx4_dpdk_src
                 ]);
 
+lio_dpdk =SrcGroups([
+                    lio_dpdk_src
+                    ])
 
 # this is the library dp going to falcon (and maybe other platforms)
 bp =SrcGroups([
@@ -1047,6 +1061,9 @@ dpdk_includes_path =''' ../src/
                         ../src/dpdk/drivers/net/ena/
                         ../src/dpdk/drivers/net/ena/base/
                         ../src/dpdk/drivers/net/ena/base/ena_defs/
+
+                        ../src/dpdk/drivers/net/liquidio/
+                        ../src/dpdk/drivers/net/liquidio/base
                          
                         ../src/dpdk/lib/
                         ../src/dpdk/lib/librte_cfgfile/
@@ -1214,6 +1231,9 @@ class build_option:
     def get_mlx4_target (self):
         return self.update_executable_name("mlx4");
 
+    def get_lio_target (self):
+        return self.update_executable_name("lio");
+
     def get_ntaccso_target (self):
         return self.update_executable_name("libntacc")+'.so';
 
@@ -1225,6 +1245,9 @@ class build_option:
 
     def get_mlx4so_target (self):
         return self.update_executable_name("libmlx4")+'.so';
+
+    def get_lioso_target (self):
+        return self.update_executable_name("liblio")+'.so';
 
     def get_bpf_target (self):
         return self.update_executable_name("bpf");
@@ -1252,6 +1275,14 @@ class build_option:
             flags += ['-UNDEBUG'];
         if bld.env.OFED_OK:
             flags += ['-DHAVE_IBV_MLX4_WQE_LSO_SEG=1']
+        return (flags)
+
+    def get_lio_flags(self, bld):
+        flags=[]
+        if self.isRelease () :
+            flags += ['-DNDEBUG'];
+        else:
+            flags += ['-UNDEBUG'];
         return (flags)
 
     def get_common_flags (self):
@@ -1399,6 +1430,18 @@ def build_prog (bld, build_obj):
           use =['ntapi'],
 
           source   = ntacc_dpdk.file_list(top),
+          target   = build_obj.get_ntacc_target()
+        )
+
+    if bld.env.WITH_LIQUIDIO == True:
+        bld.shlib(
+          features='c',
+          includes = dpdk_includes_path +
+                     bld.env.dpdk_includes_verb_path,
+          cflags   = (cflags + DPDK_FLAGS + build_obj.get_lio_flags(bld) ),
+          use =['lio'],
+
+          source   = lio_dpdk.file_list(top),
           target   = build_obj.get_ntacc_target()
         )
 
@@ -1550,6 +1593,11 @@ def install_single_system (bld, exec_p, build_obj):
     # MLX4
     do_create_link(src = os.path.realpath(o + build_obj.get_mlx4so_target()),
                    name = build_obj.get_mlx4so_target(),
+                   where = so_path)
+
+    # LIO
+    do_create_link(src = os.path.realpath(o + build_obj.get_lioso_target()),
+                   name = build_obj.get_lioso_target(),
                    where = so_path)
 
     # MNL
