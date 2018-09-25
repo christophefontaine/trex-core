@@ -148,4 +148,18 @@ public:
 };
 
 
+/* TODO: Test */
+class CTRexExtendedDriverLio : public CTRexExtendedDriverVirtBase {
+public:
+    CTRexExtendedDriverLio();
+    static CTRexExtendedDriverBase * create(){
+        return ( new CTRexExtendedDriverLio() );
+    }
+
+    virtual bool get_extended_stats(CPhyEthIF * _if,CPhyEthIFStats *stats) {
+        return get_extended_stats_fixed(_if, stats, 4, 4);
+    };
+
+    virtual void update_configuration(port_cfg_t * cfg);
+};
 #endif /* TREX_DRIVERS_VIRTUAL_H */

@@ -426,6 +426,7 @@ main_src = SrcGroup(dir='src',
              'drivers/trex_driver_mlx5.cpp',
              'drivers/trex_driver_ntacc.cpp',
              'drivers/trex_driver_vic.cpp',
+             'drivers/trex_driver_lio.cpp',
              'drivers/trex_driver_virtual.cpp',
 
              'utils/utl_counter.cpp',

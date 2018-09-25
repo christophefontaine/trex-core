@@ -170,6 +170,13 @@ void CTRexExtendedDriverAfPacket::update_configuration(port_cfg_t * cfg){
     cfg->tx_offloads.common_required &= ~DEV_TX_OFFLOAD_MULTI_SEGS;
 }
 
+void CTRexExtendedDriverLio::update_configuration(port_cfg_t * cfg) {
+    CTRexExtendedDriverVirtBase::update_configuration(cfg);
+    cfg->m_tx_conf.tx_thresh.pthresh = TX_PTHRESH;
+    cfg->m_tx_conf.tx_thresh.hthresh = TX_HTHRESH;
+    cfg->m_tx_conf.tx_thresh.wthresh = TX_WTHRESH;
+}
+
 ///////////////////////////////////////////////////////// VF
 
 CTRexExtendedDriverI40evf::CTRexExtendedDriverI40evf() {
